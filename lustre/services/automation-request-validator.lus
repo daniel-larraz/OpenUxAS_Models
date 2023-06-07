@@ -49,6 +49,13 @@ let
         );
     );
 
+    var last_UAR : message =
+      if in_msg.kind = unique_automation_response then
+        in_msg
+      else
+        (no_message -> pre last_UAR)
+    ;
+
     mode Automation_Response (
         require (
             out_msg <> no_message
@@ -74,12 +81,15 @@ let
           Automation Response message that is referenced in the Automation
           Response message.\n  "
         (
-            out_msg      = arv_future_out_msg
-        ) => (
-            O(in_msg.kind  = unique_automation_response and
-              in_msg.id    = arv_future_out_msg.ref and
-              in_msg.route = arv_future_out_msg.route)
-        );
+            true
+        ) -> (
+            pre last_UAR.kind = unique_automation_response
+            and
+            out_msg.ref = pre last_UAR.id
+            and
+            out_msg.route = pre last_UAR.route
+        )
+        ;
     );
 tel;
 

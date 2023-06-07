@@ -373,6 +373,8 @@ var
 
     -- the service that holds the token
     token_holder : token_holder_type;
+
+    last_UAR, prev_last_UAR : message;
 let
     (in_msg,
      last_nonempty_msg_id,
@@ -489,37 +491,59 @@ let
     --     in_msg      = wm_future_out_msg
     -- );
 
+    last_UAR =
+      if in_msg.kind = unique_automation_response then
+        in_msg
+      else
+        (no_message -> pre last_UAR)
+    ;
+
+    prev_last_UAR = no_message -> pre last_UAR;
+
     check "P3.
       Reestablish Automation Request Validator R5.\n  "
     (
-        O(in_msg.kind  = unique_automation_response and
-          in_msg.id    = arv_future_out_msg.ref and
-          in_msg.route = arv_future_out_msg.route)
+        (
+            true
+        ) -> (
+            pre prev_last_UAR.kind = unique_automation_response
+            and
+            in_msg.ref = pre prev_last_UAR.id
+            and
+            in_msg.route = pre prev_last_UAR.route
+        )
     ) provided (
-        in_msg.kind = automation_response and
-        in_msg      = arv_future_out_msg
+        in_msg.kind = automation_response
     );
 
-    -- check "P3.1.
-    --   The route on an Automation Response message is the same route on a prior
-    --   Unique Automation Response message.\n  "
-    -- (
-    --     O(in_msg.kind  = unique_automation_response and
-    --       in_msg.route = arv_future_out_msg.route)
-    -- ) provided (
-    --     in_msg.kind = automation_response and
-    --     in_msg      = arv_future_out_msg
-    -- );
+    check "P3.1.
+       The route on an Automation Response message is the same route on a prior
+       Unique Automation Response message.\n  "
+    (
+        (
+            true
+        ) -> (
+            pre prev_last_UAR.kind = unique_automation_response
+            and
+            in_msg.route = pre prev_last_UAR.route
+        )
+    ) provided (
+        in_msg.kind = automation_response
+    );
 
     check "P3.2.
       An Automation Response is always preceded by an associated Unique Automation Response
       message.\n  "
     (
-        O(in_msg.kind = unique_automation_response and
-          in_msg.id   = arv_future_out_msg.ref)
+        (
+            true
+        ) -> (
+            pre prev_last_UAR.kind = unique_automation_response
+            and
+            in_msg.ref = pre prev_last_UAR.id
+        )
     ) provided (
-        in_msg.kind = automation_response and
-        in_msg      = arv_future_out_msg
+        in_msg.kind = automation_response
     );
 
     check "P3.3.
@@ -529,16 +553,6 @@ let
         O(in_msg.kind = unique_automation_response)
     ) provided (
         in_msg.kind = automation_response
-    );
-
-    check "P3.4.
-      An Automation Response is always preceded by a Unique Automation Response
-      message - with extra hypothesis.\n  "
-    (
-        O(in_msg.kind = unique_automation_response)
-    ) provided (
-        in_msg.kind = automation_response and
-        in_msg      = arv_future_out_msg
     );
 
     -- check "P4.
