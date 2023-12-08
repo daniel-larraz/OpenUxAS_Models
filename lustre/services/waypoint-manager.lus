@@ -28,7 +28,7 @@ let
     guarantee "Waypoint Manager R1. IC.
       The Waypoint Manager initial condition is to send no message.\n  "
     (
-        O(out_msg = no_message)
+        (out_msg = no_message) -> true
     );
 
     guarantee "Waypoint Manager R2. Respects bus access.
@@ -39,33 +39,43 @@ let
         out_msg = no_message
     );
 
-    guarantee "Waypoint Manager R3. Message IDs.
-      The Waypoint Manager correctly computes output message IDs.\n  "
-    (
-        out_msg <> no_message
-    ) => (
-        out_msg.id = in_id + 1
+
+    mode No_Message (
+        require (
+            out_msg = no_message
+        );
     );
 
-    guarantee "Waypoint Manager R4. Possible responses.
-      The Waypoint Manager responds only with specific messages.\n  "
-    (
-        out_msg.kind = mission_command xor
-        out_msg      = no_message
-    );
+    mode Mission_Command (
+        require (
+            out_msg <> no_message
+        );
 
-    guarantee "Waypoint Manager R5.
-      When the Waypoint Manager sends a Mission Command message, the waypoint
-      sent is contained in the route that belongs to the previously received
-      Automation Response message that is referenced in the Mission Command
-      message.\n  "
-    (
-        out_msg.kind = mission_command and
-        out_msg      = wm_future_out_msg
-    ) => (
-        O(in_msg.kind = automation_response and
-          in_msg.id   = wm_future_out_msg.ref and
-          contains(in_msg.route, wm_future_out_msg.waypoint))
+        ensure "Waypoint Manager R3. Message IDs.
+          The Waypoint Manager correctly computes output message IDs.\n  "
+        (
+            out_msg.id = in_id + 1
+        );
+
+        ensure "Waypoint Manager R4. Only Response.
+          The Waypoint Manager only sends Mission_Command messages.\n  "
+        (
+            out_msg.kind = mission_command
+        );
+
+        ensure "Waypoint Manager R5.
+          When the Waypoint Manager sends a Mission Command message, the
+          waypoint sent is contained in the route that belongs to the
+          previously received Automation Response message that is referenced in
+          the Mission Command message.\n  "
+        (
+            out_msg = wm_future_out_msg
+        ) => (
+            O(in_msg.kind  = automation_response and
+              in_msg.id    = wm_future_out_msg.ref and
+              in_msg.route = wm_future_out_msg.route and
+              contains(in_msg.route, wm_future_out_msg.waypoint))
+        );
     );
 tel;
 
@@ -101,6 +111,10 @@ var
 
     -- The waypoint to send
     waypoint : waypoint_type;
+const
+    current_out_msg_p5 : message;
+    current_out_msg_p6 : message;
+    current_out_msg_p7 : message;
 let
     -- ===================================================================== --
     -- Service Behavior
@@ -143,30 +157,29 @@ let
                     no_message;
 
 
-    -- "If the service receives an Automation Response message, the service
-    --  shall store the route from the Automation Response message. Otherwise,
-    --  if there is no next waypoint, the service shall clear the stored
-    --  route."
-    route = if in_msg.kind = automation_response and
-               nonempty_sequence(in_msg.route)
-            then
-                in_msg.route
-            else if waypoint <> no_waypoint then
-                no_route -> pre(route)
-            else
-                no_route;
+    frame (route, route_msg_id)
+        -- "The stored route shall initially be cleared."
+        route = no_route;
 
+        -- "The stored route message ID shall initially be cleared."
+        route_msg_id = no_id;
+    let
+        -- "If the service receives an Automation Response message, the service
+        --  shall store the route from the Automation Response message and the
+        --  ID of the Automation Response message."
+        if in_msg.kind = automation_response and
+            nonempty_sequence(in_msg.route)
+        then
+            route        = in_msg.route;
+            route_msg_id = in_msg.id;
 
-    -- "If the service receives an Automation Response message, the service
-    --  shall store the ID of the Automation Response message."
-    route_msg_id =  if in_msg.kind = automation_response and
-                       nonempty_sequence(in_msg.route)
-                    then
-                        in_msg.id
-                    else if waypoint <> no_waypoint then
-                        no_id -> pre(route_msg_id)
-                    else
-                        no_id;
+        -- "If there is no next waypoint, the service shall clear the stored
+        --  route and the stored route message ID."
+        elsif waypoint = no_waypoint then
+            route        = no_route;
+            route_msg_id = no_id;
+        fi
+    tel
 
 
     -- ===================================================================== --
@@ -174,9 +187,9 @@ let
 
     check "L1. Lemma for R4.\n  "
     (
-        out_msg.kind = mission_command
-    ) => (
         contains(out_msg.route, out_msg.waypoint)
+    ) provided (
+        out_msg.kind = mission_command
     );
 
 
@@ -185,9 +198,9 @@ let
       The Waypoint Manager never sends 'no waypoint' as part of a Mission
       Command.\n  "
     (
-        out_msg.kind = mission_command
-    ) => (
         out_msg.waypoint <> no_waypoint
+    ) provided (
+        out_msg.kind = mission_command
     );
 
 
@@ -200,57 +213,129 @@ let
 
 
     -- This property, which is interesting in its own right, functions as a
-    -- lemma for proving our requirement R4.
+    -- lemma for proving our requirement R5.
     check "P3.
       When the Waypoint Manager sends a Mission Command message, the referenced
       Automation Response message was previously received.\n  "
     (
-        out_msg.kind = mission_command and
-        out_msg      = wm_future_out_msg
-    ) => (
         O(in_msg.kind = automation_response and
           in_msg.id   = wm_future_out_msg.ref)
+    ) provided (
+        out_msg.kind = mission_command and
+        out_msg      = wm_future_out_msg
+    );
+
+    check "Waypoint Manager P4.
+      A Mission Command message ouput is always preceded by an Automation
+      Response message input.\n  "
+    (
+        O (in_msg.kind = automation_response)
+    ) provided (
+        out_msg.kind = mission_command
+    );
+
+    check "Waypoint Manager P5.
+      When the Waypoint Manager sends a Mission Command message, the referenced
+      Automation Response message was previously received.\n  "
+    -- forall (current_out_msg_p5 : message)
+    (
+        O (in_msg.kind = automation_response and
+           in_msg.id   = current_out_msg_p5.ref)
+    ) provided (
+        out_msg.kind = mission_command and
+        out_msg      = current_out_msg_p5
+    );
+
+    check "Waypoint Manager P6.
+      When the Waypoint Manager sends a Mission Command message, the route
+      contained in the output message is always contained on a previously
+      received Automation Response message.\n  "
+    -- forall (current_out_msg_p6 : message)
+    (
+        O (in_msg.kind = automation_response and
+           in_msg.route = current_out_msg_p6.route)
+    ) provided (
+        out_msg.kind = mission_command and
+        out_msg      = current_out_msg_p6
+    );
+
+    check "Waypoint Manager P7.
+      When the Waypoint Manager sends a Mission Command message, the waypoint
+      contained in the output message is always contained on the route of a
+      previously received Automation Response message.\n  "
+    -- forall (current_out_msg_p7 : message)
+    (
+        O (in_msg.kind = automation_response and
+           contains(in_msg.route, current_out_msg_p7.waypoint))
+    ) provided (
+        out_msg.kind = mission_command and
+        out_msg      = current_out_msg_p7
     );
 
 
     -- ===================================================================== --
-    -- Antecedent Witnesses
+    -- Lemmas from IC3
     --
-    -- These are grouped, rather than placed with their properties, so that
-    -- they can easily be enabled / disabled: they tend to pollute the output
-    -- when expected-true properties are falsified.
+    -- These speed up the proof - especially if we try for monolithic proof.
 
-    -- check "L1.A. Witness antecedent of L1."
-    -- not (
-    --     out_msg.kind = mission_command
-    -- );
+    check "L2.1 from IC3"
+    (O (in_msg.kind = automation_response and
+        in_msg.route = current_out_msg_p6.route) or
+     (not (0 <= route.first_index)) or
+     (not (route.last_index = current_out_msg_p6.route.last_index)) or
+     (not (route.first_index = current_out_msg_p6.route.first_index)));
 
-    -- check "L2.A. Witness antecedent of L2."
-    -- not (
-    --     out_msg.kind = mission_command
-    -- );
+    check "L2.2 from IC3"
+    (O (in_msg.kind = automation_response and
+        in_msg.id   = current_out_msg_p5.ref) or
+     (not (0 <= route.first_index)) or
+     (not (route_msg_id = current_out_msg_p7.ref)) or
+     (not (current_out_msg_p5.ref = current_out_msg_p7.ref)));
 
+    check "L2.3 from IC3"
+    (O (in_msg.kind = automation_response) or (not (0 <= route.first_index)));
 
-    -- check "P1.A. Witness antecedent of P1."
-    -- not (
-    --     out_msg.kind = mission_command
-    -- );
+    check "L2.4 from IC3"
+    (O(in_msg.kind = automation_response and
+       in_msg.id   = wm_future_out_msg.ref) or (not (route_msg_id = wm_future_out_msg.ref)) or (not (0 <= route.first_index)));
 
-    -- check "P3.A. Witness antecedent of P3."
-    -- not (
-    --     out_msg.kind = mission_command
-    -- );
+    check "L2.5 from IC3"
+    (O (in_msg.kind = automation_response and
+        contains(in_msg.route, current_out_msg_p7.waypoint)) or
+     (not (current_out_msg_p7.waypoint <= current_out_msg_p7.route.last_index)) or
+     (not (route.first_index <= (-1 + current_out_msg_p7.waypoint))) or
+     (not (current_out_msg_p7.route.last_index = route.last_index)));
 
-    -- check "P4.A. Witness antecedent of P4."
-    -- not (
-    --     out_msg.kind = mission_command and
-    --     out_msg      = wm_future_out_msg
-    -- );
+    check "L2.6 from IC3"
+    (O (in_msg.kind = automation_response and
+        in_msg.id   = current_out_msg_p5.ref) or
+     (not (0 <= route.first_index)) or (not (route_msg_id = current_out_msg_p5.ref)));
 
+    check "L2.7 from IC3"
+    (O (in_msg.kind = automation_response and
+        contains(in_msg.route, current_out_msg_p7.waypoint)) or
+     (not (0 <= route.first_index)) or (not (route.first_index = current_out_msg_p7.waypoint)));
 
-    -- check "R1.A. Witness antecedent of R1."
-    -- not (
-    --     out_msg.kind = mission_command and
-    --     out_msg      = wm_future_out_msg
-    -- );
+    check "L2.8 from IC3"
+    (O(in_msg.kind  = automation_response and
+       in_msg.id    = wm_future_out_msg.ref and
+       in_msg.route = wm_future_out_msg.route and
+       contains(in_msg.route, wm_future_out_msg.waypoint)) or
+     (not (route.last_index = wm_future_out_msg.route.last_index)) or
+     (not (route.first_index = wm_future_out_msg.route.first_index)) or
+     (not (route_msg_id = wm_future_out_msg.ref)) or
+     (not (0 <= route.first_index)) or
+     (not (wm_future_out_msg.route.first_index <= wm_future_out_msg.waypoint)) or
+     (not (wm_future_out_msg.waypoint <= wm_future_out_msg.route.last_index)));
+
+    check "L2.9 from IC3"
+    (O(in_msg.kind  = automation_response and
+       in_msg.id    = wm_future_out_msg.ref and
+       in_msg.route = wm_future_out_msg.route and
+       contains(in_msg.route, wm_future_out_msg.waypoint)) or
+     (not (route.first_index = wm_future_out_msg.waypoint)) or
+     (not (route.last_index = wm_future_out_msg.route.last_index)) or
+     (not (route.first_index = wm_future_out_msg.route.first_index)) or
+     (not (route_msg_id = wm_future_out_msg.ref)) or
+     (not (0 <= route.first_index)));
 tel;

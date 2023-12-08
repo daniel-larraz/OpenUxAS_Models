@@ -277,67 +277,39 @@ let
 
     check "structure P1. sequence of length 1 has same element at first and last index\n  "
     (
-        nonempty_sequence(sequence) and
-        sequence.first_index = sequence.last_index
-    ) => (
         get(sequence, sequence.first_index) =
         get(sequence, sequence.last_index)
-    );
-
-    check "structure P1.A. witness P1 antecedent"
-    not (
+    ) provided (
         nonempty_sequence(sequence) and
         sequence.first_index = sequence.last_index
     );
 
     check "structure P2. find_first implies find_last\n  "
     (
-        first_index_of(sequence, search_element) <> no_index
-    ) => (
         last_index_of(sequence, search_element) <> no_index
-    );
-
-    check "structure P2.A. witness P2 antecedent"
-    not (
+    ) provided (
         first_index_of(sequence, search_element) <> no_index
     );
 
     check "structure P3. find_last implies find_first\n  "
     (
-        last_index_of(sequence, search_element) <> no_index
-    ) => (
         first_index_of(sequence, search_element) <> no_index
-    );
-
-    check "structure P3.A. witness P3 antecedent"
-    not (
+    ) provided (
         last_index_of(sequence, search_element) <> no_index
     );
 
     check "structure P4. find_last >= find_first\n  "
     (
-        first_index_of(sequence, search_element) = search_index and
-        search_index <> no_index
-    ) => (
         last_index_of(sequence, search_element) >= search_index
-    );
-
-    check "structure P4.A. witness P4 antecedent"
-    not (
+    ) provided (
         first_index_of(sequence, search_element) = search_index and
         search_index <> no_index
     );
 
     check "structure P5. find_first <= find_last\n  "
     (
-        last_index_of(sequence, search_element) = search_index and
-        search_index <> no_index
-    ) => (
         first_index_of(sequence, search_element) <= search_index
-    );
-
-    check "structure P5.A. witness P5 antecedent"
-    not (
+    ) provided (
         last_index_of(sequence, search_element) = search_index and
         search_index <> no_index
     );
@@ -350,28 +322,16 @@ let
 
     check "get P1. successful get implies containment\n  "
     (
-        nonempty_sequence(sequence) and
-        valid_index(sequence, search_index)
-    ) => (
         contains(sequence, get(sequence, search_index))
-    );
-
-    check "get P1.A. witness P1 antecedent"
-    not (
+    ) provided (
         nonempty_sequence(sequence) and
         valid_index(sequence, search_index)
     );
 
     check "get P2. unsuccessful get implies no containment\n  "
     (
-        nonempty_sequence(sequence) and
-        get(sequence, search_index) = no_element
-    ) => (
         not contains(sequence, get(sequence, search_index))
-    );
-
-    check "get P2.A. witness P2 antecedent"
-    not (
+    ) provided (
         nonempty_sequence(sequence) and
         get(sequence, search_index) = no_element
     );
@@ -382,29 +342,16 @@ let
 
     check "first_index_of P1. successful first_index_of implies get will return search element\n  "
     (
-        nonempty_sequence(sequence) and
-        first_index_of(sequence, search_element) <> no_index
-    ) => (
         get(sequence, first_index_of(sequence, search_element)) = search_element
-    );
-
-    check "first_index_of P1.A. witness P1 antecedent"
-    not (
+    ) provided (
         nonempty_sequence(sequence) and
         first_index_of(sequence, search_element) <> no_index
     );
 
     check "first_index_of P2. unsuccessful first_index_of implies get will not return search element\n  "
     (
-        nonempty_sequence(sequence) and
-        first_index_of(sequence, search_element) = no_index and
-        search_element <> no_element
-    ) => (
         get(sequence, first_index_of(sequence, search_element)) <> search_element
-    );
-
-    check "first_index_of P2.A. witness P2 antecedent"
-    not (
+    ) provided (
         nonempty_sequence(sequence) and
         first_index_of(sequence, search_element) = no_index and
         search_element <> no_element
@@ -412,14 +359,8 @@ let
 
     check "first_index_of P3. unsuccessful first_index_of implies get will return no element\n  "
     (
-        nonempty_sequence(sequence) and
-        first_index_of(sequence, search_element) = no_index
-    ) => (
         get(sequence, first_index_of(sequence, search_element)) = no_element
-    );
-
-    check "first_index_of P3.A. witness P3 antecedent"
-    not (
+    ) provided (
         nonempty_sequence(sequence) and
         first_index_of(sequence, search_element) = no_index
     );
@@ -430,29 +371,16 @@ let
 
     check "last_index_of P1. successful last_index_of implies get will return search element\n  "
     (
-        nonempty_sequence(sequence) and
-        last_index_of(sequence, search_element) <> no_index
-    ) => (
         get(sequence, last_index_of(sequence, search_element)) = search_element
-    );
-
-    check "last_index_of P1.A. witness P1 antecedent"
-    not (
+    ) provided (
         nonempty_sequence(sequence) and
         last_index_of(sequence, search_element) <> no_index
     );
 
     check "last_index_of P2. unsuccessful last_index_of implies get will not return search element\n  "
     (
-        nonempty_sequence(sequence) and
-        last_index_of(sequence, search_element) = no_index and
-        search_element <> no_element
-    ) => (
         get(sequence, last_index_of(sequence, search_element)) <> search_element
-    );
-
-    check "last_index_of P2.A. witness P2 antecedent"
-    not (
+    ) provided (
         nonempty_sequence(sequence) and
         last_index_of(sequence, search_element) = no_index and
         search_element <> no_element
@@ -460,14 +388,8 @@ let
 
     check "last_index_of P3. unsuccessful last_index_of implies get will return no element\n  "
     (
-        nonempty_sequence(sequence) and
-        last_index_of(sequence, search_element) = no_index
-    ) => (
         get(sequence, last_index_of(sequence, search_element)) = no_element
-    );
-
-    check "last_index_of P3.A. witness P3 antecedent"
-    not (
+    ) provided (
         nonempty_sequence(sequence) and
         last_index_of(sequence, search_element) = no_index
     );
@@ -478,15 +400,8 @@ let
 
     check "is_first P1. is_first implies not before\n  "
     (
-        nonempty_sequence(sequence) and
-        free_element <> search_element and
-        is_first(sequence, search_element)
-    ) => (
         not before(sequence, free_element, search_element)
-    );
-
-    check "is_first P1.A. witness P1 antecedent"
-    not (
+    ) provided (
         nonempty_sequence(sequence) and
         free_element <> search_element and
         is_first(sequence, search_element)
@@ -494,15 +409,8 @@ let
 
     check "is_last P1. is_last implies not after\n  "
     (
-        nonempty_sequence(sequence) and
-        free_element <> search_element and
-        is_last(sequence, search_element)
-    ) => (
         not after(sequence, free_element, search_element)
-    );
-
-    check "is_last P1.A. witness P1 antecedent"
-    not (
+    ) provided (
         nonempty_sequence(sequence) and
         free_element <> search_element and
         is_last(sequence, search_element)
@@ -510,14 +418,8 @@ let
 
     check "is_unique P1. is_unique implies first_index_of = last_index_of\n  "
     (
-        nonempty_sequence(sequence) and
-        is_unique(sequence, search_element)
-    ) => (
         first_index_of(sequence, search_element) = last_index_of(sequence, search_element)
-    );
-
-    check "is_unique P1.A. witness P1 antecedent"
-    not (
+    ) provided (
         nonempty_sequence(sequence) and
         is_unique(sequence, search_element)
     );
@@ -527,43 +429,27 @@ let
     -- Witnesses - these are interesting to enable, as they build confidence
     -- in the formalism
 
-    check "witness 1: can generate a sequence with identical first and last indices"
-    (
-        nonempty_sequence(sequence)
-    ) => not (
-        sequence.first_index = sequence.last_index
-    );
+    check reachable "Witness 1: can generate a sequence with identical first and last indices"
+    (nonempty_sequence(sequence) and
+     sequence.first_index = sequence.last_index);
 
-    check "witness 2: can generate a sequence with different first and last indices"
-    (
-        nonempty_sequence(sequence)
-    ) => not (
-        sequence.first_index <> sequence.last_index
-    );
+    check reachable "Witness 2: can generate a sequence with different first and last indices"
+    (nonempty_sequence(sequence) and
+     sequence.first_index <> sequence.last_index);
 
-    check "witness 3: can generate a sequence of length n"
-    not (
-        nonempty_sequence(sequence) and
-        sequence.last_index - sequence.first_index = free_length
-    );
+    check reachable "Witness 3: can generate a sequence of length n"
+    (nonempty_sequence(sequence) and
+     sequence.last_index - sequence.first_index = free_length);
 
-    check "witness 4: sequence of length n can have different elements at first and last"
-    (
-        nonempty_sequence(sequence) and
-        sequence.last_index - sequence.first_index = free_length
-    ) => not (
-        get(sequence, sequence.first_index) <>
-        get(sequence, sequence.last_index)
-    );
+    check reachable "Witness 4: sequence of length n can have different elements at first and last"
+    (nonempty_sequence(sequence) and
+     sequence.last_index - sequence.first_index = free_length and
+     get(sequence, sequence.first_index) <> get(sequence, sequence.last_index));
 
     -- This check fails, as mentioned above, because the formalism does not
     -- allow non-unque elements: each element is equal to its index.
-    check "witness 5: sequence of length n can have the same elements at first and last"
-    (
-        nonempty_sequence(sequence) and
-        sequence.last_index - sequence.first_index = free_length
-    ) => not (
-        get(sequence, sequence.first_index) =
-        get(sequence, sequence.last_index)
-    );
+    check reachable "Witness 5: sequence of length n can have the same elements at first and last"
+    (nonempty_sequence(sequence) and
+     sequence.last_index - sequence.first_index = free_length and
+     get(sequence, sequence.first_index) = get(sequence, sequence.last_index));
 tel;

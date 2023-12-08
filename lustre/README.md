@@ -36,8 +36,8 @@ Two key differences between Lustre and typical programming languages are worth h
 There is a an extension for VS Code available for kind2: https://marketplace.visualstudio.com/items?itemName=kind2-mc.vscode-kind2
 
 This extension offers excellent syntax highlighting and coding support for lustre, as well as integrated commands for checking and simulating lustre nodes.
-The extension does not support compositional analysis, which is required to prove the OpenUxAS properties.
-You should thus also install the command-line tool, `kind2`.
+Before checking properties, make sure to enable both compositional and modular analysis using the Kind 2: Properties tab in VS Code.
+See the extension help for more information.
 
 ### Installing Kind2 ###
 

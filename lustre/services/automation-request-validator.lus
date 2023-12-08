@@ -26,12 +26,11 @@ contract arv_contract(
     out_msg : message;
 );
 let
-
     guarantee "Automation Request Validator R1. IC.
       The Automation Request Validator initial condition is to send no
       message.\n  "
     (
-        O(out_msg = no_message)
+        (out_msg = no_message) -> true
     );
 
     guarantee "Automation Request Validator R2. Respects bus access.
@@ -43,35 +42,51 @@ let
         out_msg = no_message
     );
 
-    guarantee "Automation Request Validator R3. Message IDs.
-      The Automation Request Validator correctly computes output message
-      IDs.\n  "
-    (
-        out_msg <> no_message
-    ) => (
-        out_msg.id = in_id + 1
+
+    mode No_Message (
+        require (
+            out_msg = no_message
+        );
     );
 
-    guarantee "Automation Request Validator R4. Possible responses.
-      The Automation Request Validator responds only with specific
-      messages.\n  "
-    (
-        out_msg.kind = automation_response xor
-        out_msg      = no_message
-    );
+    mode Automation_Response (
+        require (
+            out_msg <> no_message
+        );
 
-    guarantee "Automation Request Validator R5.
-      When the Automation Request Validator sends an Automation Response
-      message, the route sent belongs to the previously received Unique
-      Automation Response message that is referenced in the Automation Response
-      message.\n  "
-    (
-        out_msg.kind = automation_response and
-        out_msg      = arv_future_out_msg
-    ) => (
-        O(in_msg.kind  = unique_automation_response and
-          in_msg.id    = arv_future_out_msg.ref and
-          in_msg.route = arv_future_out_msg.route)
+        ensure "Automation Request Validator R3. Message IDs.
+          The Automation Request Validator correctly computes output message
+          IDs.\n  "
+        (
+            out_msg.id = in_id + 1
+        );
+
+        ensure "Automation Request Validator R4. Only Response.
+          The Automation Request Validator only sends Automation Response
+          messages.\n  "
+        (
+            out_msg.kind = automation_response
+        ) ;
+
+        ensure "Automation Request Validator R5.
+          When the Automation Request Validator sends an Automation Response
+          message, the route sent belongs to the previously received Unique
+          Automation Response message that is referenced in the Automation
+          Response message.\n  "
+        (
+            out_msg      = arv_future_out_msg
+        ) => (
+            O(in_msg.kind  = unique_automation_response and
+              in_msg.id    = arv_future_out_msg.ref and
+              in_msg.route = arv_future_out_msg.route)
+        );
+
+        ensure "Automation Request Validator R5.1.
+          An Automation Response message is only output after a Unique
+          Automation Response message is received.\n  "
+        (
+            O(in_msg.kind  = unique_automation_response)
+        );
     );
 tel;
 
@@ -104,6 +119,11 @@ var
 
     -- The ID of the message that provided the route above
     route_msg_id : id_type;
+const
+    -- Free constants for use in properties
+    current_out_msg_p2 : message;
+    current_out_msg_p3 : message;
+    current_out_msg_p4 : message;
 let
     -- ===================================================================== --
     -- Service Behavior
@@ -145,22 +165,52 @@ let
                     else
                         no_id;
 
-
     -- ===================================================================== --
-    -- Antecedent Witnesses
-    --
-    -- These are grouped, rather than placed with their properties, so that
-    -- they can easily be enabled / disabled: they tend to pollute the output
-    -- when expected-true properties are falsified.
+    -- Properties
 
-    -- check "P1.A. Witness antecedent of P1."
-    -- not (
-    --     out_msg <> no_message
-    -- );
+    check "Automation Request Validator P1.
+      An Automation Response message output is always preceded by a Unique
+      Automation Response message input.\n  "
+    (
+        O (in_msg.kind = unique_automation_response)
+    ) provided (
+        out_msg.kind = automation_response
+    );
 
-    -- check "R1.A. Witness antecedent of R1."
-    -- not (
-    --     out_msg.kind = automation_response and
-    --     out_msg      = arv_future_out_msg
-    -- );
+    check "Automation Request Validator P2.
+      An Automation Response message output always references a previously
+      received Unique Automation Response message input.\n  "
+    -- forall (current_out_msg_p2 : message)
+    (
+        O (in_msg.kind = unique_automation_response and
+           in_msg.id   = current_out_msg_p2.ref)
+    ) provided (
+        out_msg.kind = automation_response and
+        out_msg      = current_out_msg_p2
+    );
+
+    check "Automation Request Validator P3.
+      An Automation Response message output's route is always contained on a
+      previously received Unique Automation Response message.\n"
+    -- forall (current_out_msg_p3 : message)
+    (
+        O (in_msg.kind  = unique_automation_response and
+           in_msg.route = current_out_msg_p3.route)
+    ) provided (
+        out_msg.kind = automation_response and
+        out_msg      = current_out_msg_p3
+    );
+
+    check "Automation Request Validator P4.
+      An Automation Response message output always references a Unique
+      Automation Response message input with the same route.\n"
+    -- forall (current_out_msg_p4 : message)
+    (
+        O (in_msg.kind  = unique_automation_response and
+           in_msg.id    = current_out_msg_p4.ref and
+           in_msg.route = current_out_msg_p4.route)
+    ) provided (
+        out_msg.kind = automation_response and
+        out_msg      = current_out_msg_p4
+    );
 tel;

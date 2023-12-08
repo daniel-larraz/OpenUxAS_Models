@@ -4,6 +4,12 @@ include "../common/types.lus"
 include "../common/pltl.lus"
 
 
+-- This constant represents a skolemized universally quantified variable
+-- that we use to link details of a message appearing the past with details
+-- of our output message in properties.
+const task_future_out_msg : message;
+
+
 contract task_contract(
     -- The message currently received by the service
     in_msg : message;
@@ -32,20 +38,58 @@ let
         out_msg = no_message
     );
 
-    guarantee "Task R3. Message IDs.
-      The Task correctly computes output message IDs.\n  "
+    guarantee "One Mode Active"
     (
-        out_msg <> no_message
-    ) => (
-        out_msg.id = in_id + 1
+        (::No_Message xor ::Some_Message) and
+        (::Some_Message => (::Task_Complete xor ::Error_Response))
     );
 
-    guarantee "Task R4. Possible responses.
-      The Task responds only with specific messages.\n  "
-    (
-        out_msg.kind = task_complete  xor
-        out_msg.kind = error_response xor
-        out_msg      = no_message
+    mode No_Message (
+        require (
+            out_msg = no_message
+        );
+    );
+
+    mode Some_Message (
+        require (
+            out_msg <> no_message
+        );
+
+        ensure "Task R3. Message IDs.
+          The Task correctly computes output message IDs.\n  "
+        (
+            out_msg.id = in_id + 1
+        );
+    );
+
+    mode Task_Complete (
+        require ::Some_Message;
+        require (
+            out_msg.kind = task_complete
+        );
+
+        ensure "R4.
+          When the Task sends a Task Complete message, the monitored route was
+          contained in a previously received Automation Response message.\n  "
+        (
+            out_msg      = task_future_out_msg
+        ) => (
+            O(in_msg.kind  = automation_response and
+              in_msg.route = task_future_out_msg.route)
+        );
+    );
+
+    mode Error_Response (
+        require ::Some_Message;
+        require (
+            out_msg.kind = error_response
+        );
+
+        ensure "Task R3. Message IDs.
+          The Task correctly computes output message IDs.\n  "
+        (
+            out_msg.id = in_id + 1
+        );
     );
 tel;
 
@@ -77,7 +121,7 @@ var
     monitored_route : route_type;
 
     -- The current index, for iterating over the route to match waypoints.
-    route_index : index_type;
+    waypoint_index : index_type;
 
     -- The waypoint that is expected to be sent from the monitored route.
     expected_waypoint : waypoint_type;
@@ -85,75 +129,74 @@ var
     -- True if the received waypoint doesn't match the expected waypoint.
     error : bool;
 const
-    -- This constant represents a skolemized universally quantified variable
-    -- that we use to link details of a message appearing the past with details
-    -- of our output message in properties.
-    task_future_out_msg : message;
-
-    free_route_index : index_type;
+    free_waypoint_index : index_type;
 let
     -- ===================================================================== --
     -- Task Behavior
 
-    -- Store the incoming route or maintain the route previously stored
-    monitored_route =   if in_msg.kind = automation_response then
-                            in_msg.route
-                        else
-                            no_route -> pre(monitored_route);
+    frame (monitored_route, waypoint_index, expected_waypoint)
+        -- "The monitored route shall initially be cleared."
+        monitored_route = no_route;
+
+        -- "The stored waypoint index shall initially be cleared."
+        waypoint_index = no_index;
+
+        -- "The expected waypoint shall initially be cleared."
+        expected_waypoint = no_waypoint;
+    let
+        -- "If the service receives an Automation Response message, the service
+        --  shall store the route from the Automation Response message and the
+        --  index of the first waypoint in the route."
+        if in_msg.kind = automation_response then
+            monitored_route = in_msg.route;
+            waypoint_index  = in_msg.route.first_index;
+
+        -- "If the service receives a Mission Command message, the service
+        --  shall increment the waypoint index and shall expect to receive the
+        --  waypoint retrieved from the monitored route at the prior index."
+        elsif in_msg.kind = mission_command then
+            waypoint_index = pre(waypoint_index) + 1;
+
+            -- This feels clumsy. For mission command M, we bump the waypoint
+            -- index but expect to see the waypoint at the prior index (i.e.,
+            -- prior to the bump). So we have to fetch from the route using
+            -- pre.
+            expected_waypoint = get(monitored_route, no_index -> pre(waypoint_index));
+        fi
+    tel
 
 
-    -- Reset the route index if we get an automation response.
-    -- Increment if we get a mission command
-    -- Hold otherwise.
-    --
-    -- We don't use next_waypoint, because next_waypoint won't reset if we
-    -- happen to get the same route multiple times in a row. (This is an
-    -- error in waypoint manager, arguably, too, but we should demonstrate
-    -- that the compositional check will find this.)
-    route_index =   if in_msg.kind = automation_response then
-                        monitored_route.first_index
-                    else if in_msg.kind = mission_command then
-                        no_index -> (pre(route_index) + 1)
-                    else
-                        no_index -> pre(route_index);
+    frame (error)
+        -- "The error flag shall initially be cleared."
+        error = false;
+    let
+        -- "If the service receives an Automation Response message, the service
+        --  shall clear its error flag."
+        if in_msg.kind = automation_response then
+            error = false;
 
-
-    -- expected_waypoint = if in_msg.kind = automation_response then
-    --                        in_msg.kind = mission_command
-    --                     then
-    --                         next_waypoint(monitored_route)
-    --                     else
-    --                         no_waypoint -> pre(expected_waypoint);
-
-    expected_waypoint = get(monitored_route, route_index);
-
-
-    -- Set an error flag if we see the wrong waypoint on a mission command.
-    -- This is reset if we get a new automation response.
-    --
-    -- TODO: clean up the logic here
-    error = if in_msg.kind = automation_response then
-                false
-            else if in_msg.kind = mission_command then
-                (false -> pre(error)) or
-                (true -> (pre(expected_waypoint) <> in_msg.waypoint))
-            else
-                false -> pre(error);
+        -- "If the service receives a Mission Command message, the service
+        --  shall preserve the error flag if set or set the error flag if
+        --  the received waypoint differs from the expected waypoint."
+        elsif in_msg.kind = mission_command then
+            error = pre(error) or expected_waypoint <> in_msg.waypoint;
+        fi
+    tel
 
 
     out_msg =   if -- no error was raised (we saw all waypoints expected)
                    not error and
 
                    -- we are actually monitoring a sequence (otherwise the
-                    -- value of route_index is undefined)
+                    -- value of waypoint_index is undefined)
                    nonempty_sequence(monitored_route) and
 
                    -- we've run out of waypoints to expect
-                   expected_waypoint = no_waypoint and
+                   waypoint_index > monitored_route.last_index and
 
                    -- we actually were looking for waypoints prior to running
                    -- out of waypoints to expect
-                   (false -> (pre(expected_waypoint) <> no_waypoint)) and
+                   expected_waypoint <> no_waypoint and
 
                    -- we are permitted to send a message
                    can_send_message
@@ -181,7 +224,7 @@ let
                         id       = in_id + 1;
                         ref      = no_id;
                         route    = monitored_route;
-                        waypoint = no_waypoint -> pre(expected_waypoint);
+                        waypoint = expected_waypoint;
                     }
                 else
                     no_message;
@@ -199,24 +242,24 @@ let
       When the Task sends a Task Complete message, it has received every
       waypoint on the route it was monitoring.\n"
     (
+        O(in_msg.kind     = mission_command and
+          in_msg.waypoint = get(task_future_out_msg.route, free_waypoint_index))
+    ) provided (
         out_msg.kind = task_complete and
         out_msg      = task_future_out_msg and
 
-        valid_index(out_msg.route, free_route_index)
-    ) => (
-        O(in_msg.kind     = mission_command and
-          in_msg.waypoint = get(task_future_out_msg.route, free_route_index))
+        valid_index(out_msg.route, free_waypoint_index)
     );
 
     check "P2.1.
       When the Task sends a Task Complete message, the monitored route was
       contained in a previously received Automation Response message.\n  "
     (
-        out_msg.kind = task_complete and
-        out_msg      = task_future_out_msg
-    ) => (
         O(in_msg.kind  = automation_response and
           in_msg.route = task_future_out_msg.route)
+    ) provided (
+        out_msg.kind = task_complete and
+        out_msg      = task_future_out_msg
     );
 
 
@@ -224,11 +267,11 @@ let
       When the Task sends an Error Response message, it has received a waypoint
       that does not match the expected waypoint.\n  "
     (
-        out_msg.kind = error_response and
-        out_msg      = task_future_out_msg
-    ) => (
         false -> O(in_msg.kind     = mission_command and
                    in_msg.waypoint <> task_future_out_msg.waypoint)
+    ) provided (
+        out_msg.kind = error_response and
+        out_msg      = task_future_out_msg
     );
 
     check "P3.1.
@@ -236,92 +279,21 @@ let
       is no_route or was contained in a previously received Automation Response
       message.\n  "
     (
-        out_msg.kind = error_response and
-        out_msg      = task_future_out_msg
-    ) => (
         out_msg.route = no_route or
         O(in_msg.kind  = automation_response and
           in_msg.route = task_future_out_msg.route)
+    ) provided (
+        out_msg.kind = error_response and
+        out_msg      = task_future_out_msg
     );
 
     check "P3.2.
       When the Task sends an Error Response message, the expected waypoint is
       either no_waypoint or is on the monitored route.\n  "
     (
-        out_msg.kind = error_response
-    ) => (
         out_msg.waypoint = no_waypoint or
         contains(out_msg.route, out_msg.waypoint)
+    ) provided (
+        out_msg.kind = error_response
     );
-
-
-    check "L1.
-      Lemma (from IC3).\n  "
-    (
-        not error
-        and
-        expected_waypoint <> no_element
-        and
-        expected_waypoint <> free_route_index
-        and
-        task_future_out_msg.route.first_index = monitored_route.first_index
-        and
-        free_route_index > task_future_out_msg.route.first_index
-        and
-        free_route_index <= task_future_out_msg.route.last_index
-        and
-        free_route_index <= route_index
-    ) => (
-        O(in_msg.kind     = mission_command and
-          in_msg.waypoint = get(task_future_out_msg.route, free_route_index))
-    );
-
-
-    check "L2.\n  "
-    (
-       monitored_route.first_index = task_future_out_msg.route.first_index and
-       monitored_route.last_index = task_future_out_msg.route.last_index and
-       monitored_route.first_index >= 0
-    ) => (
-       O(in_msg.kind  = automation_response and
-         in_msg.route = task_future_out_msg.route)
-    );
-
-    -- ===================================================================== --
-    -- Antecedent Witnesses
-    --
-    -- These are grouped, rather than placed with their properties, so that
-    -- they can easily be enabled / disabled: they tend to pollute the output
-    -- when expected-true properties are falsified.
-
-    -- check "P2.A. Witness antecedent of P2."
-    -- not (
-    --     out_msg.kind = task_complete and
-    --     out_msg      = task_future_out_msg and
-
-    --     valid_index(out_msg.route, free_route_index)
-    -- );
-
-    -- check "P2.1.A. Witness antecedent of P2.1."
-    -- not (
-    --     out_msg.kind = task_complete and
-    --     out_msg      = task_future_out_msg
-    -- );
-
-    -- check "P3.A. Witness antecedent of P3."
-    -- not (
-    --     out_msg.kind = error_response and
-    --     out_msg      = task_future_out_msg
-    -- );
-
-    -- check "P3.1.A. Witness antecedent of P3.1."
-    -- not (
-    --     out_msg.kind = error_response and
-    --     out_msg      = task_future_out_msg
-    -- );
-
-    -- check "P3.2.A. Witness antecedent of P3.2."
-    -- (
-    --     out_msg.kind = error_response
-    -- );
 tel;
