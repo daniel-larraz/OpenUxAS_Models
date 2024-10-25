@@ -4,12 +4,6 @@ include "../common/types.lus"
 include "../common/pltl.lus"
 
 
--- This constant represents a skolemized universally quantified variable
--- that we use to link details of a message appearing the past with details
--- of our output message in properties.
-const task_future_out_msg : message;
-
-
 contract task_contract(
     -- The message currently received by the service
     in_msg : message;
@@ -72,10 +66,9 @@ let
           When the Task sends a Task Complete message, the monitored route was
           contained in a previously received Automation Response message.\n  "
         (
-            out_msg      = task_future_out_msg
-        ) => (
-            O(in_msg.kind  = automation_response and
-              in_msg.route = task_future_out_msg.route)
+          exists (m: history(in_msg))
+            m.kind  = automation_response and
+            m.route = out_msg.route
         );
     );
 
@@ -242,12 +235,11 @@ let
       When the Task sends a Task Complete message, it has received every
       waypoint on the route it was monitoring.\n"
     (
-        O(in_msg.kind     = mission_command and
-          in_msg.waypoint = get(task_future_out_msg.route, free_waypoint_index))
+        exists (m: history(in_msg))
+          m.kind = mission_command and
+          m.waypoint = get(out_msg.route, free_waypoint_index)
     ) provided (
         out_msg.kind = task_complete and
-        out_msg      = task_future_out_msg and
-
         valid_index(out_msg.route, free_waypoint_index)
     );
 
@@ -255,11 +247,11 @@ let
       When the Task sends a Task Complete message, the monitored route was
       contained in a previously received Automation Response message.\n  "
     (
-        O(in_msg.kind  = automation_response and
-          in_msg.route = task_future_out_msg.route)
+        exists (m: history(in_msg))
+          m.kind = automation_response and
+          m.route = out_msg.route
     ) provided (
-        out_msg.kind = task_complete and
-        out_msg      = task_future_out_msg
+        out_msg.kind = task_complete
     );
 
 
@@ -267,11 +259,13 @@ let
       When the Task sends an Error Response message, it has received a waypoint
       that does not match the expected waypoint.\n  "
     (
-        false -> O(in_msg.kind     = mission_command and
-                   in_msg.waypoint <> task_future_out_msg.waypoint)
+        false -> (
+          exists (m: history(in_msg))
+            m.kind = mission_command and
+            m.waypoint <> out_msg.waypoint
+        )
     ) provided (
-        out_msg.kind = error_response and
-        out_msg      = task_future_out_msg
+        out_msg.kind = error_response
     );
 
     check "P3.1.
@@ -280,11 +274,13 @@ let
       message.\n  "
     (
         out_msg.route = no_route or
-        O(in_msg.kind  = automation_response and
-          in_msg.route = task_future_out_msg.route)
+        (
+          exists (m: history(in_msg))
+            m.kind = automation_response and
+            m.route = out_msg.route
+        )
     ) provided (
-        out_msg.kind = error_response and
-        out_msg      = task_future_out_msg
+        out_msg.kind = error_response
     );
 
     check "P3.2.
@@ -296,4 +292,39 @@ let
     ) provided (
         out_msg.kind = error_response
     );
+
+    check "L1. Lemma for R4.\n  "
+    (
+      monitored_route = no_route
+      or
+      (
+        exists (m: history(in_msg))
+          m.kind = automation_response and
+          m.route = monitored_route
+      )
+    ) ;
+
+    check "L2. Lemma for R4.\n  "
+    (
+      not error and
+      waypoint_index <> free_waypoint_index and
+      monitored_route.first_index=free_waypoint_index
+      =>
+       exists (m: history(in_msg))
+          m.kind = mission_command and
+          m.waypoint = get(monitored_route, free_waypoint_index)
+    );
+
+    check "L3. Lemma for R4.\n  "
+    (
+      not error and
+      waypoint_index <> free_waypoint_index and
+      waypoint_index >= free_waypoint_index and
+      free_waypoint_index > monitored_route.first_index
+      =>
+       exists (m: history(in_msg))
+          m.kind = mission_command and
+          m.waypoint = get(monitored_route, free_waypoint_index)
+    );
+
 tel;
