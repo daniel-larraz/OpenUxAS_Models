@@ -1,0 +1,49 @@
+-- daidalus_types.lus
+
+type resolution = enum {
+    --abstraction of finding an acceptable action
+    acceptable_action,
+
+    --abstraction of failing to find an acceptable action or a revert behavior
+    --due to improper configuration
+    improperly_configured,
+
+    --abstraction of doing a fallback behavior as a result of not finding an
+    --acceptable behavior
+    revert_behavior
+};
+
+type quality = enum {
+    --resolution via acceptable action in altitude
+    divert_altitude_successful,
+
+    --resolution via acceptable action in heading
+    divert_heading_successful,
+
+    --resolution via acceptable action in groundspeed
+    divert_speed_successful,
+
+    --resolution via fallback maneuver in altitude, heading, or groundspeed
+    fallback,
+
+    --resolution via maintaing status quo due to improper configuration/use
+    no_recourse
+};
+
+type detection_message = struct {
+    --abstraction of entity list used to determine RoW
+    RoW_status : bool;
+
+    --abstraction of time to violation list used to determine if action needs 
+    --to be taken
+    action_threshold : bool;
+
+    --abstraction of the DAIDALUS altitude bands
+    altitude_bands : resolution;
+
+    --abstraction of the DAIDALUS heading bands
+    heading_bands : resolution;
+
+    --abstraction of the DAIDALUS groundspeed bands
+    speed_bands : resolution;
+};

@@ -1,0 +1,34 @@
+-- speed_resolution.lus
+
+--include "common/types.lus"
+include "../common/daidalus_types.lus"
+
+contract speed_resolution_contract (
+    speed_bands : resolution;
+) returns (found : resolution);
+let
+    guarantee "Groundspeed Resolution R1.
+    The speed resolution results in an acceptable action, a revert 
+    behavior, or problem was improperly configured. /n "
+    (
+        (found = acceptable_action) or (found = revert_behavior) or 
+        (found = improperly_configured)
+    );
+tel.
+
+
+node speed_resolution (speed_bands : resolution) returns 
+(found : resolution);
+(*@contract 
+import speed_resolution_contract(speed_bands) returns (found);
+*)
+let
+    found = speed_bands;
+
+    check "Groundspeed Resolution results in acceptable_action, revert_behavior
+    or improperly_configured. /n "
+    (
+        (found = acceptable_action) or (found = revert_behavior) or 
+        (found = improperly_configured)
+    );
+tel.
