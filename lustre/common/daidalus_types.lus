@@ -30,6 +30,43 @@ type quality = enum {
     no_recourse
 };
 
+type classification = enum {
+    --determiniation when the mode under analysis of the next waypoint is not 
+    --withing an alerting DAIDALUS dectection band
+    safe,
+
+    --determination when the mode under analysis of the next waypoint is 
+    --within an alerting DAIDALUS dectection band
+    unsafe
+};
+
+type status = enum {
+    --indicative of ownship following waypoints as part of a mission command
+    OnMission,
+
+    --indicative of ownship's well clear volume projected to be violated within
+    --25 seconds
+    InConflict,
+
+    --indicative of ownship needing to divert in an attempt to mitigate the 
+    --projected loss of well clear
+    Divert,
+
+    --indicative of holding the last command issued for the ownship
+    OnHold    
+};
+
+type response_message_kind = enum{
+    --no message sent
+    None,
+
+    --divert message as heading/speed/altitude
+    divert_hsa,
+
+    --mission command resuming previous mession
+    return_mission_command
+};
+
 type detection_message = struct {
     --abstraction of entity list used to determine RoW
     RoW_status : bool;
@@ -46,4 +83,18 @@ type detection_message = struct {
 
     --abstraction of the DAIDALUS groundspeed bands
     speed_bands : resolution;
+};
+
+type next_waypoint = struct {
+    --abstaction of checking the alitude of the next waypoint in comparison to
+    --DAIDALUS altitude bands
+    altitude : classification;
+    
+    --abstraction of checking the heading of the next waypoint in comparison to
+    --DAIDALUS heading bands
+    heading : classification;
+
+    --abstraction of checking the ground speed of the next waypoint in 
+    --comparison to DAIDALUS groundspeed bands
+    speed : classification;
 };

@@ -36,6 +36,26 @@ node SetDivertState (
 ) returns (resolution_quality : quality);
 (*@contract import SetDivertStateContract(altitude_bands, heading_bands, 
 speed_bands) returns (resolution_quality);*)
+
+var
+    altitude_res : resolution;
+    heading_res : resolution;
+    speed_res : resolution;
+
 let
+
+
+    altitude_res = altitude_resolution (altitude_bands);
+    heading_res = heading_resolution(heading_bands);
+    speed_res = speed_resolution(speed_bands);
+    resolution_quality = if (altitude_res = acceptable_action) then 
+    divert_altitude_successful 
+    else if (heading_res = acceptable_action) then 
+    divert_heading_successful
+    else if (speed_res = acceptable_action) then 
+    divert_speed_successful 
+    else if ((altitude_res = revert_behavior) or (heading_res = revert_behavior)
+    or (speed_res = revert_behavior)) then fallback else
+    no_recourse;
 
 tel;

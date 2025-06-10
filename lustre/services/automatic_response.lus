@@ -1,6 +1,12 @@
 -- automatic_response
 
-include "../common/types.lus"
+--include "../common/types.lus"
+include "../functions/SetDivertState.lus"
 include "../functions/altitude_resolution.lus"
 include "../functions/heading_resolution.lus"
 include "../functions/speed_resolution.lus"
+include "../functions/SafeToReturn.lus"
+
+contract automatic_response (
+    
+)
