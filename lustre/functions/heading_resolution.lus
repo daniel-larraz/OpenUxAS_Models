@@ -14,7 +14,7 @@ let
         (found = acceptable_action) or (found = revert_behavior) or 
         (found = improperly_configured)
     );
-tel.
+tel
 
 
 node heading_resolution (heading_bands : resolution) returns 
@@ -31,4 +31,4 @@ let
         (found = acceptable_action) or (found = revert_behavior) or 
         (found = improperly_configured)
     );
-tel.
+tel

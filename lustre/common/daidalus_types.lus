@@ -86,6 +86,9 @@ type detection_message = struct {
 };
 
 type next_waypoint = struct {
+    --abstraction of whether there exists a waypoint to return to
+    isNext : bool;
+
     --abstaction of checking the alitude of the next waypoint in comparison to
     --DAIDALUS altitude bands
     altitude : classification;

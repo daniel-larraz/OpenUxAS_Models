@@ -1,12 +1,105 @@
 -- automatic_response
 
 --include "../common/types.lus"
+include "../common/daidalus_types.lus"
 include "../functions/SetDivertState.lus"
 include "../functions/altitude_resolution.lus"
 include "../functions/heading_resolution.lus"
 include "../functions/speed_resolution.lus"
 include "../functions/SafeToReturn.lus"
 
-contract automatic_response (
+(*contract automatic_response_contract(
+    violation_message : detection_message;
+) returns (response_message : response_message_kind);
+var
+    m_statuts : status;
+let
+    guarantee "Automatic Response R1. The End State is not InConflict. /n"
     
-)
+    (true);
+tel*)
+
+node automatic_response (violation_message : detection_message) returns 
+(response_message : response_message_kind);
+(*@contract 
+    var m_status_contract : status = any {x : status | (x = OnMission) or 
+                                     (x = OnHold)} -> pre m_status_contract;
+    guarantee "Automatic Resoponse R1. The result of automatic response is not
+               InConflict. /n"
+    m_status_contract <> InConflict;
+ *)
+var
+    m_status : status;
+    DAIDALUS_altitude_bands : resolution;
+    DAIDALUS_heading_bands : resolution;
+    DAIDALUS_speed_bands : resolution;
+    m_RoW_status : bool;
+    m_Divert_resolution_quality : quality;
+    m_isSafeToReturn : bool;
+    m_nextwaypoint : next_waypoint;
+    PreviousStatus : status;
+    followingWaypoints : bool;
+    HadToResolveConflict : bool;
+    initialFollowingWaypoints : bool;
+let
+    DAIDALUS_altitude_bands = violation_message.altitude_bands;
+    DAIDALUS_heading_bands = violation_message.heading_bands;
+    DAIDALUS_speed_bands = violation_message.speed_bands;
+    PreviousStatus = any {x : status | (x = OnMission) or (x = OnHold)} ->
+                     pre m_status;
+    initialFollowingWaypoints = any bool or (if PreviousStatus = OnMission 
+                                then true else false) -> 
+                                pre initialFollowingWaypoints;
+    if violation_message.action_threshold = true then 
+        HadToResolveConflict = true;
+        m_RoW_status = violation_message.RoW_status;
+        if m_RoW_status then
+            m_status = OnHold;
+            followingWaypoints = initialFollowingWaypoints -> 
+                                 pre followingWaypoints;
+        else
+            m_nextwaypoint = next_waypoint {isNext = any bool;
+                                            altitude = any classification;
+                                            heading = any classification;
+                                            speed = any classification};
+            m_Divert_resolution_quality = SetDivertState(DAIDALUS_altitude_bands,
+            DAIDALUS_heading_bands, DAIDALUS_speed_bands);
+            --sent VehicleActionCommand to DivertState
+            followingWaypoints = false;
+            m_status = OnHold;
+        fi
+
+    else
+        HadToResolveConflict = false;
+        --entered in OnHold from InConflict + RoW
+        if PreviousStatus = OnHold then
+            if initialFollowingWaypoints -> pre followingWaypoints then 
+                m_status = OnMission;
+            else
+                if m_nextwaypoint.isNext then 
+                    m_isSafeToReturn = SafeToReturn(m_nextwaypoint);
+                    if m_isSafeToReturn then 
+                        followingWaypoints = true;
+                        m_status = OnMission;
+                    else
+                        followingWaypoints = initialFollowingWaypoints -> 
+                                             pre followingWaypoints;
+                        m_status = PreviousStatus -> pre m_status;
+                    fi
+                else
+                    followingWaypoints = initialFollowingWaypoints -> 
+                                         pre followingWaypoints;
+                    m_status = PreviousStatus -> pre m_status;
+                fi
+            fi
+        else --PreviousStatus = OnMission
+            m_status = PreviousStatus -> pre m_status;
+            followingWaypoints = initialFollowingWaypoints -> 
+                                 pre followingWaypoints;
+        fi
+    fi
+
+    check "Ending State is not InConflict. /n"
+    (m_status = OnHold or m_status = OnMission);
+
+tel
