@@ -8,38 +8,48 @@ include "../functions/heading_resolution.lus"
 include "../functions/speed_resolution.lus"
 include "../functions/SafeToReturn.lus"
 
-(*contract automatic_response_contract(
-    violation_message : detection_message;
-) returns (response_message : response_message_kind);
-var
-    m_statuts : status;
-let
+contract automatic_response_contract (
+    violation_message : detection_message
+) returns (response_message : response_message_kind;
+            m_status : status;
+            HadToResolveConflict : bool;
+            m_RoW_status : bool);
+
+let 
     guarantee "Automatic Response R1. The End State is not InConflict. /n"
     
-    (true);
-tel*)
+    (m_status = OnHold or m_status = OnMission);
+
+    guarantee "If there was no need to resolve conflict, the either contiuing 
+                mission or holding last command."
+    (if not HadToResolveConflict then (response_message = None and (m_status = 
+    OnHold or m_status = OnMission )) xor 
+    (response_message = return_mission_command and m_status = OnMission) else 
+    (m_status = OnHold and response_message = None and m_RoW_status = true) xor 
+    (m_status = OnHold and response_message = divert_hsa and 
+    m_RoW_status = false));
+tel 
 
 node automatic_response (violation_message : detection_message) returns 
-(response_message : response_message_kind);
+(response_message : response_message_kind;
+ m_status : status;
+ HadToResolveConflict : bool;
+ m_RoW_status : bool);
 (*@contract 
-    var m_status_contract : status = any {x : status | (x = OnMission) or 
-                                     (x = OnHold)} -> pre m_status_contract;
-    guarantee "Automatic Resoponse R1. The result of automatic response is not
-               InConflict. /n"
-    m_status_contract <> InConflict;
- *)
+import automatic_response_contract (violation_message) returns 
+(response_message, m_status, HadToResolveConflict, m_RoW_status) ;
+*)
 var
-    m_status : status;
+--    m_status : status;
     DAIDALUS_altitude_bands : resolution;
     DAIDALUS_heading_bands : resolution;
     DAIDALUS_speed_bands : resolution;
-    m_RoW_status : bool;
     m_Divert_resolution_quality : quality;
     m_isSafeToReturn : bool;
     m_nextwaypoint : next_waypoint;
     PreviousStatus : status;
     followingWaypoints : bool;
-    HadToResolveConflict : bool;
+--    HadToResolveConflict : bool;
     initialFollowingWaypoints : bool;
 let
     DAIDALUS_altitude_bands = violation_message.altitude_bands;
@@ -55,6 +65,7 @@ let
         m_RoW_status = violation_message.RoW_status;
         if m_RoW_status then
             m_status = OnHold;
+            response_message = None;
             followingWaypoints = initialFollowingWaypoints -> 
                                  pre followingWaypoints;
         else
@@ -64,6 +75,7 @@ let
                                             speed = any classification};
             m_Divert_resolution_quality = SetDivertState(DAIDALUS_altitude_bands,
             DAIDALUS_heading_bands, DAIDALUS_speed_bands);
+            response_message = divert_hsa;
             --sent VehicleActionCommand to DivertState
             followingWaypoints = false;
             m_status = OnHold;
@@ -75,20 +87,24 @@ let
         if PreviousStatus = OnHold then
             if initialFollowingWaypoints -> pre followingWaypoints then 
                 m_status = OnMission;
+                response_message = None;
             else
                 if m_nextwaypoint.isNext then 
                     m_isSafeToReturn = SafeToReturn(m_nextwaypoint);
                     if m_isSafeToReturn then 
+                        response_message = return_mission_command;
                         followingWaypoints = true;
                         m_status = OnMission;
                     else
                         followingWaypoints = initialFollowingWaypoints -> 
                                              pre followingWaypoints;
+                        response_message = None;
                         m_status = PreviousStatus -> pre m_status;
                     fi
                 else
                     followingWaypoints = initialFollowingWaypoints -> 
                                          pre followingWaypoints;
+                    response_message = None;
                     m_status = PreviousStatus -> pre m_status;
                 fi
             fi
@@ -96,10 +112,19 @@ let
             m_status = PreviousStatus -> pre m_status;
             followingWaypoints = initialFollowingWaypoints -> 
                                  pre followingWaypoints;
+            response_message = None;
         fi
     fi
 
     check "Ending State is not InConflict. /n"
     (m_status = OnHold or m_status = OnMission);
 
+    check "Status determination if had to resolve conflict vs not having to 
+           resolve conflict. /n"
+    (if not HadToResolveConflict then (response_message = None and (m_status = 
+    OnHold or m_status = OnMission )) xor 
+    (response_message = return_mission_command and m_status = OnMission) else 
+    (m_status = OnHold and response_message = None and m_RoW_status = true) xor 
+    (m_status = OnHold and response_message = divert_hsa and 
+    m_RoW_status = false));  
 tel
