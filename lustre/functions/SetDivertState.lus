@@ -58,4 +58,10 @@ let
     or (speed_res = revert_behavior)) then fallback else
     no_recourse;
 
+    check (resolution_quality = divert_altitude_successful xor 
+           resolution_quality = divert_heading_successful xor 
+           resolution_quality = divert_speed_successful xor 
+           resolution_quality = fallback xor 
+           resolution_quality = no_recourse);
+
 tel;

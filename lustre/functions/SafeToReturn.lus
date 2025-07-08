@@ -24,6 +24,9 @@ let
     IsSafeToReturn = if ((waypoint.altitude = safe) and 
     (waypoint.heading = safe) and (waypoint.speed = safe)) then true else
     false;
+
+    check (waypoint.altitude = safe and waypoint.heading = safe and waypoint.
+           speed = safe ) provided (IsSafeToReturn);
 tel.
 
 
