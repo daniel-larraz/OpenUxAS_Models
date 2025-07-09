@@ -20,7 +20,7 @@ let
     
     (m_status = OnHold or m_status = OnMission);
 
-    guarantee "If there was no need to resolve conflict, the either contiuing 
+    guarantee "If there was no need to resolve conflict, then either continuing 
                 mission or holding last command."
     (if not HadToResolveConflict then (response_message = None and (m_status = 
     OnHold or m_status = OnMission )) xor 
