@@ -1,6 +1,4 @@
 -- automatic_response
-
---include "../common/types.lus"
 include "../common/daidalus_types.lus"
 include "../functions/SetDivertState.lus"
 include "../functions/altitude_resolution.lus"
@@ -16,12 +14,14 @@ contract automatic_response_contract (
             m_RoW_status : bool);
 
 let 
-    guarantee "Automatic Response R1. The End State is not InConflict. /n"
+    guarantee "Automatic Response R1. The End State is not InConflict. "
     
     (m_status = OnHold or m_status = OnMission);
 
-    guarantee "If there was no need to resolve conflict, then either continuing 
-                mission or holding last command."
+    guarantee "Automatic Response R2.  If there was a need to resolve conflict, 
+               either ownship is right of way and performed no action or ownship
+                diverted. If there was no need, either perform no action or 
+                return to mission if safe to return."
     (if not HadToResolveConflict then (response_message = None and (m_status = 
     OnHold or m_status = OnMission )) xor 
     (response_message = return_mission_command and m_status = OnMission) else 
@@ -40,7 +40,6 @@ import automatic_response_contract (violation_message) returns
 (response_message, m_status, HadToResolveConflict, m_RoW_status) ;
 *)
 var
---    m_status : status;
     DAIDALUS_altitude_bands : resolution;
     DAIDALUS_heading_bands : resolution;
     DAIDALUS_speed_bands : resolution;
@@ -49,34 +48,48 @@ var
     m_nextwaypoint : next_waypoint;
     PreviousStatus : status;
     followingWaypoints : bool;
---    HadToResolveConflict : bool;
     initialFollowingWaypoints : bool;
 let
+    --abstraction for pulling altitude bands from wellclear violation message
     DAIDALUS_altitude_bands = violation_message.altitude_bands;
+    --abstraction for pulling heading bands from wellclear violation message
     DAIDALUS_heading_bands = violation_message.heading_bands;
+    --abstraction for pulling groundspeed bands from wellclear violation message
     DAIDALUS_speed_bands = violation_message.speed_bands;
+    --abstraction for state holding status classification from previous iteration
     PreviousStatus = any {x : status | (x = OnMission) or (x = OnHold)} ->
                      pre m_status;
+    --abstraction for whether or not ownship is following waypoints at the 
+    --beginning of the current iteration
     initialFollowingWaypoints = any bool or (if PreviousStatus = OnMission 
                                 then true else false) -> 
                                 pre initialFollowingWaypoints;
+    --begin response action if time to violation is <= action threshold
     if violation_message.action_threshold = true then 
         HadToResolveConflict = true;
+        --abstraction for determining Right-of-Way status for ownship
         m_RoW_status = violation_message.RoW_status;
+        --if need to resolve and ownship is RoW, transition to OnHold with no
+        --change in flight status (continue following waypoints or continue heading)
         if m_RoW_status then
             m_status = OnHold;
             response_message = None;
             followingWaypoints = initialFollowingWaypoints -> 
                                  pre followingWaypoints;
         else
+            --abstraction for capture of next waypoint(may or maynot exist)
+            (*better abstraction would preserve no waypoints once triggered and 
+            not allow waypoints if started from a false initialFollowingWaypoints*)
             m_nextwaypoint = next_waypoint {isNext = any bool;
                                             altitude = any classification;
                                             heading = any classification;
                                             speed = any classification};
+            --call SetDivertState to determine divert heading/speed/altitude
             m_Divert_resolution_quality = SetDivertState(DAIDALUS_altitude_bands,
             DAIDALUS_heading_bands, DAIDALUS_speed_bands);
+            --abstraction of sending divert command
             response_message = divert_hsa;
-            --sent VehicleActionCommand to DivertState
+            --sent VehicleActionCommand to DivertState therefore not following waypoints
             followingWaypoints = false;
             m_status = OnHold;
         fi
@@ -86,22 +99,27 @@ let
         --entered in OnHold from InConflict + RoW
         if PreviousStatus = OnHold then
             if initialFollowingWaypoints -> pre followingWaypoints then 
+            --if following waypoints then ownship is on mission and response sends no messages
                 m_status = OnMission;
                 response_message = None;
             else
                 if m_nextwaypoint.isNext then 
                     m_isSafeToReturn = SafeToReturn(m_nextwaypoint);
                     if m_isSafeToReturn then 
+                        --if next waypoint is safe to return, send mission command 
+                        --return to mission
                         response_message = return_mission_command;
                         followingWaypoints = true;
                         m_status = OnMission;
                     else
+                        --if next waypoint is not safe, continue to hold 
                         followingWaypoints = initialFollowingWaypoints -> 
                                              pre followingWaypoints;
                         response_message = None;
                         m_status = PreviousStatus -> pre m_status;
                     fi
                 else
+                    --if not following waypoints continue current hsa
                     followingWaypoints = initialFollowingWaypoints -> 
                                          pre followingWaypoints;
                     response_message = None;
@@ -109,6 +127,7 @@ let
                 fi
             fi
         else --PreviousStatus = OnMission
+            --on mission and no conflict = continue mission
             m_status = PreviousStatus -> pre m_status;
             followingWaypoints = initialFollowingWaypoints -> 
                                  pre followingWaypoints;

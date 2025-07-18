@@ -1,6 +1,4 @@
 --SafeToReturn.lus
-
---include "common/types.lus"
 include "../common/daidalus_types.lus"
 
 contract SafeToReturnContract (
@@ -8,7 +6,7 @@ contract SafeToReturnContract (
 ) returns (IsSafeToReturn : bool);
 let
     guarantee "SafeToReturn returns true when the next waypoint is not in the 
-    altitude, heading, or groundspeed bands provided by DAIDALUS detection. /n"
+    NEAR altitude, heading, or groundspeed bands provided by DAIDALUS detection."
     (
         IsSafeToReturn =>
         ((waypoint.altitude = safe) and (waypoint.heading = safe) and 
@@ -21,6 +19,7 @@ node SafeToReturn (waypoint : next_waypoint) returns (IsSafeToReturn : bool);
 import SafeToReturnContract(waypoint) returns (IsSafeToReturn);
 *)
 let
+    --next waypoint is only checked if there is a mission waypoint to return to
     IsSafeToReturn = if ((waypoint.altitude = safe) and 
     (waypoint.heading = safe) and (waypoint.speed = safe)) then true else
     false;

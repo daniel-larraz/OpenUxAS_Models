@@ -1,6 +1,4 @@
 -- heading_resolution.lus
-
---include "../common/types.lus"
 include "../common/daidalus_types.lus"
 
 contract heading_resolution_contract (

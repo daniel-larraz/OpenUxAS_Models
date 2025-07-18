@@ -1,6 +1,4 @@
 -- SetDivertState.lus
-
---include "../common/types.lus"
 include "../common/daidalus_types.lus"
 include "../functions/altitude_resolution.lus"
 include "../functions/heading_resolution.lus"
@@ -43,20 +41,24 @@ var
     speed_res : resolution;
 
 let
-
-
+    --abstraction of calling altitude_resolution
     altitude_res = altitude_resolution (altitude_bands);
-    heading_res = heading_resolution(heading_bands);
-    speed_res = speed_resolution(speed_bands);
-    resolution_quality = if (altitude_res = acceptable_action) then 
-    divert_altitude_successful 
-    else if (heading_res = acceptable_action) then 
-    divert_heading_successful
-    else if (speed_res = acceptable_action) then 
-    divert_speed_successful 
-    else if ((altitude_res = revert_behavior) or (heading_res = revert_behavior)
-    or (speed_res = revert_behavior)) then fallback else
-    no_recourse;
+    if not (altitude_res = acceptable_action) then
+        --abstraction of calling heading_resolution
+        heading_res = heading_resolution(heading_bands);
+        if not (heading_res = acceptable_action) then 
+            --abstraction of calling speed_resolution
+            speed_res = speed_resolution(speed_bands);
+            resolution_quality = if (speed_res = acceptable_action) then
+                                 divert_speed_successful else (if 
+                                 (speed_res = revert_behavior) then fallback
+                                 else no_recourse);
+        else
+            resolution_quality = divert_heading_successful;
+        fi  
+    else
+        resolution_quality = divert_altitude_successful;
+    fi 
 
     check (resolution_quality = divert_altitude_successful xor 
            resolution_quality = divert_heading_successful xor 

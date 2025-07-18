@@ -1,6 +1,4 @@
 -- speed_resolution.lus
-
---include "common/types.lus"
 include "../common/daidalus_types.lus"
 
 contract speed_resolution_contract (
@@ -14,7 +12,7 @@ let
         (found = acceptable_action) or (found = revert_behavior) or 
         (found = improperly_configured)
     );
-tel.
+tel
 
 
 node speed_resolution (speed_bands : resolution) returns 
@@ -31,4 +29,4 @@ let
         (found = acceptable_action) or (found = revert_behavior) or 
         (found = improperly_configured)
     );
-tel.
+tel

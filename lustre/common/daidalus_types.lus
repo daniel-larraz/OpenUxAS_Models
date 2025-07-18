@@ -32,11 +32,11 @@ type quality = enum {
 
 type classification = enum {
     --determiniation when the mode under analysis of the next waypoint is not 
-    --withing an alerting DAIDALUS dectection band
+    --withing a NEAR alerting DAIDALUS dectection band
     safe,
 
     --determination when the mode under analysis of the next waypoint is 
-    --within an alerting DAIDALUS dectection band
+    --within a NEAR alerting DAIDALUS dectection band
     unsafe
 };
 
@@ -56,6 +56,7 @@ type status = enum {
     OnHold    
 };
 
+--Abstraction of DAIDALUS response service sending messages
 type response_message_kind = enum{
     --no message sent
     None,
@@ -67,6 +68,13 @@ type response_message_kind = enum{
     return_mission_command
 };
 
+(*Abstraction of WellClearViolation message received.  Actual message contains
+  ownship ID and intruder ID's to determine RightofWay vehicle, time to 
+  violation that is used to determine if a threshold to take action has been 
+  met, altitude bands that determine the altitudes that a violation has/will
+  occur, heading bands that determine the heading that a violation has/will
+  occur, and groundspeed bands that determine the speeds that a violation has/will
+  occur. *)
 type detection_message = struct {
     --abstraction of entity list used to determine RoW
     RoW_status : bool;
@@ -85,6 +93,9 @@ type detection_message = struct {
     speed_bands : resolution;
 };
 
+(*Abstraction of DAIDALUS response service capturing the next waypoint ownship
+  is heading toward in order to re-route to mission after impending wellclear
+  violation has been safely handled. *)
 type next_waypoint = struct {
     --abstraction of whether there exists a waypoint to return to
     isNext : bool;
