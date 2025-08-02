@@ -39,11 +39,16 @@ const INITIALLY_FOLLOWING_WAYPOINTS:
 const INITIAL_NEXTWAYPOINT: subtype { p : next_waypoint |
     not (INITIALLY_FOLLOWING_WAYPOINTS) => not (p.isNext)};
 
---node imported get_nextwaypoint(m_previous_nextwaypoint: next_waypoint)
-node imported get_nextwaypoint(m_nextwaypoint: next_waypoint)
+-- An alternative way of representing the value of the next waypoint that
+-- is equivalent to the 'any' expression; makes clearer why using
+-- the current value of m_nextwaypoint instead of the variable holding
+-- the previous value (i.e. m_previous_nextwaypoint) introduces
+-- a cyclic dependency.
+--
+node imported get_nextwaypoint(m_previous_nextwaypoint: next_waypoint)
   returns (p: next_waypoint);
 (*@contract
-  guarantee O(false -> not (pre m_nextwaypoint.isNext)) => not (p.isNext);
+  guarantee O(false -> not (pre m_previous_nextwaypoint.isNext)) => not (p.isNext);
 *)
 
 node automatic_response (violation_message : detection_message) returns 
