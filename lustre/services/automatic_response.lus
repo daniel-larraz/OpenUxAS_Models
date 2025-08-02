@@ -1,9 +1,7 @@
 -- automatic_response
+include "../common/pltl.lus"
 include "../common/daidalus_types.lus"
 include "../functions/SetDivertState.lus"
-include "../functions/altitude_resolution.lus"
-include "../functions/heading_resolution.lus"
-include "../functions/speed_resolution.lus"
 include "../functions/SafeToReturn.lus"
 
 contract automatic_response_contract (
@@ -30,6 +28,24 @@ let
     m_RoW_status = false));
 tel 
 
+const INITIAL_STATUS:
+  subtype { s: status | (s = OnMission) or (s = OnHold)};
+
+--abstraction for whether or not ownship is following waypoints at the 
+--beginning of the current iteration
+const INITIALLY_FOLLOWING_WAYPOINTS:
+  subtype { f: bool | (INITIAL_STATUS = OnMission) => f };
+
+const INITIAL_NEXTWAYPOINT: subtype { p : next_waypoint |
+    not (INITIALLY_FOLLOWING_WAYPOINTS) => not (p.isNext)};
+
+--node imported get_nextwaypoint(m_previous_nextwaypoint: next_waypoint)
+node imported get_nextwaypoint(m_nextwaypoint: next_waypoint)
+  returns (p: next_waypoint);
+(*@contract
+  guarantee O(false -> not (pre m_nextwaypoint.isNext)) => not (p.isNext);
+*)
+
 node automatic_response (violation_message : detection_message) returns 
 (response_message : response_message_kind;
  m_status : status;
@@ -40,30 +56,23 @@ import automatic_response_contract (violation_message) returns
 (response_message, m_status, HadToResolveConflict, m_RoW_status) ;
 *)
 var
-    DAIDALUS_altitude_bands : resolution;
-    DAIDALUS_heading_bands : resolution;
-    DAIDALUS_speed_bands : resolution;
+    DAIDALUS_altitude_bands : DAIDALUS_Bands;
+    DAIDALUS_heading_bands : DAIDALUS_Bands;
+    DAIDALUS_speed_bands : DAIDALUS_Bands;
     m_Divert_resolution_quality : quality;
     m_isSafeToReturn : bool;
-    m_nextwaypoint : next_waypoint;
+    m_nextwaypoint, m_previous_nextwaypoint : next_waypoint;
     PreviousStatus : status;
-    followingWaypoints : bool;
-    initialFollowingWaypoints : bool;
+    followingWaypoints, PreviousFollowingWaypoints : bool;
 let
-    --abstraction for pulling altitude bands from wellclear violation message
-    DAIDALUS_altitude_bands = violation_message.altitude_bands;
-    --abstraction for pulling heading bands from wellclear violation message
-    DAIDALUS_heading_bands = violation_message.heading_bands;
-    --abstraction for pulling groundspeed bands from wellclear violation message
-    DAIDALUS_speed_bands = violation_message.speed_bands;
     --abstraction for state holding status classification from previous iteration
-    PreviousStatus = any {x : status | (x = OnMission) or (x = OnHold)} ->
-                     pre m_status;
-    --abstraction for whether or not ownship is following waypoints at the 
-    --beginning of the current iteration
-    initialFollowingWaypoints = any bool or (if PreviousStatus = OnMission 
-                                then true else false) -> 
-                                pre initialFollowingWaypoints;
+    PreviousStatus = INITIAL_STATUS -> pre m_status;
+
+    PreviousFollowingWaypoints = 
+      INITIALLY_FOLLOWING_WAYPOINTS -> pre followingWaypoints;
+
+    m_previous_nextwaypoint = INITIAL_NEXTWAYPOINT -> pre m_nextwaypoint;
+
     --begin response action if time to violation is <= action threshold
     if violation_message.action_threshold = true then 
         HadToResolveConflict = true;
@@ -74,16 +83,14 @@ let
         if m_RoW_status then
             m_status = OnHold;
             response_message = None;
-            followingWaypoints = initialFollowingWaypoints -> 
-                                 pre followingWaypoints;
+            followingWaypoints = PreviousFollowingWaypoints;
         else
-            --abstraction for capture of next waypoint(may or maynot exist)
-            (*better abstraction would preserve no waypoints once triggered and 
-            not allow waypoints if started from a false initialFollowingWaypoints*)
-            m_nextwaypoint = next_waypoint {isNext = any bool;
-                                            altitude = any classification;
-                                            heading = any classification;
-                                            speed = any classification};
+           --abstraction for pulling altitude bands from wellclear violation message
+            DAIDALUS_altitude_bands = violation_message.altitude_bands;
+            --abstraction for pulling heading bands from wellclear violation message
+            DAIDALUS_heading_bands = violation_message.heading_bands;
+            --abstraction for pulling groundspeed bands from wellclear violation message
+            DAIDALUS_speed_bands = violation_message.speed_bands;
             --call SetDivertState to determine divert heading/speed/altitude
             m_Divert_resolution_quality = SetDivertState(DAIDALUS_altitude_bands,
             DAIDALUS_heading_bands, DAIDALUS_speed_bands);
@@ -93,18 +100,22 @@ let
             followingWaypoints = false;
             m_status = OnHold;
         fi
-
+        m_nextwaypoint = m_previous_nextwaypoint;
     else
         HadToResolveConflict = false;
         --entered in OnHold from InConflict + RoW
         if PreviousStatus = OnHold then
-            if initialFollowingWaypoints -> pre followingWaypoints then 
+            if PreviousFollowingWaypoints then 
             --if following waypoints then ownship is on mission and response sends no messages
                 m_status = OnMission;
                 response_message = None;
+                m_nextwaypoint = m_previous_nextwaypoint;
             else
-                if m_nextwaypoint.isNext then 
-                    m_isSafeToReturn = SafeToReturn(m_nextwaypoint);
+                --abstraction for capture of next waypoint(may or maynot exist)
+                m_nextwaypoint = any { p:next_waypoint | 
+                  O(false -> not (m_previous_nextwaypoint.isNext)) => not (p.isNext) };
+                if m_previous_nextwaypoint.isNext then
+                    m_isSafeToReturn = SafeToReturn(m_previous_nextwaypoint);
                     if m_isSafeToReturn then 
                         --if next waypoint is safe to return, send mission command 
                         --return to mission
@@ -113,37 +124,49 @@ let
                         m_status = OnMission;
                     else
                         --if next waypoint is not safe, continue to hold 
-                        followingWaypoints = initialFollowingWaypoints -> 
-                                             pre followingWaypoints;
+                        followingWaypoints = PreviousFollowingWaypoints;
                         response_message = None;
-                        m_status = PreviousStatus -> pre m_status;
+                        m_status = PreviousStatus;
                     fi
                 else
                     --if not following waypoints continue current hsa
-                    followingWaypoints = initialFollowingWaypoints -> 
-                                         pre followingWaypoints;
+                    followingWaypoints = PreviousFollowingWaypoints;
                     response_message = None;
-                    m_status = PreviousStatus -> pre m_status;
+                    m_status = PreviousStatus;
                 fi
             fi
         else --PreviousStatus = OnMission
             --on mission and no conflict = continue mission
-            m_status = PreviousStatus -> pre m_status;
-            followingWaypoints = initialFollowingWaypoints -> 
-                                 pre followingWaypoints;
+            m_status = PreviousStatus;
+            followingWaypoints = PreviousFollowingWaypoints;
             response_message = None;
+            m_nextwaypoint = m_previous_nextwaypoint;
         fi
     fi
 
-    check "Ending State is not InConflict. /n"
-    (m_status = OnHold or m_status = OnMission);
+    check "Ending State is not InConflict."
+      (m_status = OnHold or m_status = OnMission);
 
-    check "Status determination if had to resolve conflict vs not having to 
-           resolve conflict. /n"
-    (if not HadToResolveConflict then (response_message = None and (m_status = 
-    OnHold or m_status = OnMission )) xor 
-    (response_message = return_mission_command and m_status = OnMission) else 
-    (m_status = OnHold and response_message = None and m_RoW_status = true) xor 
-    (m_status = OnHold and response_message = divert_hsa and 
-    m_RoW_status = false));  
+    check "Status determination if had to resolve conflict"
+      m_status = OnHold and
+      ( (m_RoW_status and response_message = None) xor
+        (not m_RoW_status and response_message = divert_hsa)
+      )
+      provided HadToResolveConflict;
+
+    check "Status determination if not having to resolve conflict"
+      ( (response_message = return_mission_command and m_status = OnMission)
+        xor
+        (response_message = None and (m_status = OnHold or m_status = OnMission ))
+      )
+      provided not HadToResolveConflict;
+
+    -- check "Status determination if had to resolve conflict vs not having to 
+    --        resolve conflict."
+    -- (if not HadToResolveConflict then (response_message = None and (m_status = 
+    -- OnHold or m_status = OnMission )) xor 
+    -- (response_message = return_mission_command and m_status = OnMission) else 
+    -- (m_status = OnHold and response_message = None and m_RoW_status = true) xor 
+    -- (m_status = OnHold and response_message = divert_hsa and 
+    -- m_RoW_status = false));  
 tel

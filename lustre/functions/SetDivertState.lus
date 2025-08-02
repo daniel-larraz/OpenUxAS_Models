@@ -5,9 +5,9 @@ include "../functions/heading_resolution.lus"
 include "../functions/speed_resolution.lus"
 
 contract SetDivertStateContract (
-    altitude_bands : resolution;
-    heading_bands : resolution;
-    speed_bands : resolution;
+    altitude_bands : DAIDALUS_Bands;
+    heading_bands : DAIDALUS_Bands;
+    speed_bands : DAIDALUS_Bands;
     )
     returns 
     (
@@ -28,9 +28,9 @@ let
 tel.
 
 node SetDivertState (
-    altitude_bands : resolution;
-    heading_bands : resolution;
-    speed_bands : resolution
+    altitude_bands : DAIDALUS_Bands;
+    heading_bands : DAIDALUS_Bands;
+    speed_bands : DAIDALUS_Bands
 ) returns (resolution_quality : quality);
 (*@contract import SetDivertStateContract(altitude_bands, heading_bands, 
 speed_bands) returns (resolution_quality);*)

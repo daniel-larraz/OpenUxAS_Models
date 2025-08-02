@@ -2,7 +2,7 @@
 include "../common/daidalus_types.lus"
 
 contract heading_resolution_contract (
-    heading_bands : resolution;
+    heading_bands : DAIDALUS_Bands;
 ) returns (found : resolution);
 let
     guarantee "Heading Resolution R1.
@@ -15,18 +15,8 @@ let
 tel
 
 
-node heading_resolution (heading_bands : resolution) returns 
+node imported heading_resolution (heading_bands : DAIDALUS_Bands) returns 
 (found : resolution);
 (*@contract 
-import heading_resolution_contract(heading_bands) returns (found);
+  import heading_resolution_contract(heading_bands) returns (found);
 *)
-let
-    found = heading_bands;
-
-    check "Heading Resolution results in acceptable_action, revert_behavior
-    or improperly_configured. /n "
-    (
-        (found = acceptable_action) or (found = revert_behavior) or 
-        (found = improperly_configured)
-    );
-tel

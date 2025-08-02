@@ -68,6 +68,8 @@ type response_message_kind = enum{
     return_mission_command
 };
 
+type DAIDALUS_Bands;
+
 (*Abstraction of WellClearViolation message received.  Actual message contains
   ownship ID and intruder ID's to determine RightofWay vehicle, time to 
   violation that is used to determine if a threshold to take action has been 
@@ -84,13 +86,13 @@ type detection_message = struct {
     action_threshold : bool;
 
     --abstraction of the DAIDALUS altitude bands
-    altitude_bands : resolution;
+    altitude_bands : DAIDALUS_Bands;
 
     --abstraction of the DAIDALUS heading bands
-    heading_bands : resolution;
+    heading_bands : DAIDALUS_Bands;
 
     --abstraction of the DAIDALUS groundspeed bands
-    speed_bands : resolution;
+    speed_bands : DAIDALUS_Bands;
 };
 
 (*Abstraction of DAIDALUS response service capturing the next waypoint ownship

@@ -2,7 +2,7 @@
 include "../common/daidalus_types.lus"
 
 contract altitude_resolution_contract (
-    altitude_bands : resolution;
+    altitude_bands : DAIDALUS_Bands;
 ) returns (found : resolution);
 let
     guarantee "Altitude Resolution R1.
@@ -15,18 +15,8 @@ let
 tel
 
 
-node altitude_resolution (altitude_bands : resolution) returns 
+node imported altitude_resolution (altitude_bands : DAIDALUS_Bands) returns 
 (found : resolution);
 (*@contract 
-import altitude_resolution_contract(altitude_bands) returns (found);
+  import altitude_resolution_contract(altitude_bands) returns (found);
 *)
-let
-    found = altitude_bands;
-
-    check "Altitude Resolution results in acceptable_action, revert_behavior
-    or improperly_configured. /n "
-    (
-        (found = acceptable_action) or (found = revert_behavior) or 
-        (found = improperly_configured)
-    );
-tel

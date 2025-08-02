@@ -2,7 +2,7 @@
 include "../common/daidalus_types.lus"
 
 contract speed_resolution_contract (
-    speed_bands : resolution;
+    speed_bands : DAIDALUS_Bands;
 ) returns (found : resolution);
 let
     guarantee "Groundspeed Resolution R1.
@@ -15,18 +15,8 @@ let
 tel
 
 
-node speed_resolution (speed_bands : resolution) returns 
+node imported speed_resolution (speed_bands : DAIDALUS_Bands) returns 
 (found : resolution);
 (*@contract 
-import speed_resolution_contract(speed_bands) returns (found);
+  import speed_resolution_contract(speed_bands) returns (found);
 *)
-let
-    found = speed_bands;
-
-    check "Groundspeed Resolution results in acceptable_action, revert_behavior
-    or improperly_configured. /n "
-    (
-        (found = acceptable_action) or (found = revert_behavior) or 
-        (found = improperly_configured)
-    );
-tel
